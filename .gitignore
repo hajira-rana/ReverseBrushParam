@@ -3,4 +3,5 @@ venv
 path.psd
 test.psd
 datagen.psjs
+brush_cnn_best.pt
 brush_cnn_best.h5
