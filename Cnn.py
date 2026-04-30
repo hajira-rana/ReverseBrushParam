@@ -17,6 +17,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import models
+
 print(torch.cuda.is_available())
 
 DEVICE = torch.device("cuda")
@@ -25,23 +26,24 @@ DEVICE = torch.device("cuda")
 # CONSTANTS
 # ============================================================
 
-IMG_SIZE   = 224
+IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS     = 50
-LR         = 1e-4
-VAL_SPLIT  = 0.2
-PATIENCE   = 8
+EPOCHS = 50
+LR = 1e-4
+VAL_SPLIT = 0.2
+PATIENCE = 8
 
 NORM = {
-    "size":      100.0,
-    "hardness":  100.0,
+    "size": 100.0,
+    "hardness": 100.0,
     "roundness": 100.0,
-    "spacing":   200.0,
+    "spacing": 200.0,
 }
 
 # ============================================================
 # DATASET INSPECTION
 # ============================================================
+
 
 def inspect_dataset(data_dir):
     pattern = re.compile(r"brush_s(\d+)_h(\d+)_r(\d+)_sp(\d+)\.png")
@@ -63,24 +65,36 @@ def inspect_dataset(data_dir):
         return
 
     print(f"Total samples: {len(sizes)}")
-    print(f"Size      — min: {min(sizes)}  max: {max(sizes)}  unique: {len(set(sizes))}")
-    print(f"Hardness  — min: {min(hardnesses)}  max: {max(hardnesses)}  unique: {len(set(hardnesses))}")
-    print(f"Roundness — min: {min(roundnesses)}  max: {max(roundnesses)}  unique: {len(set(roundnesses))}")
-    print(f"Spacing   — min: {min(spacings)}  max: {max(spacings)}  unique: {len(set(spacings))}")
+    print(
+        f"Size      — min: {min(sizes)}  max: {max(sizes)}  unique: {len(set(sizes))}"
+    )
+    print(
+        f"Hardness  — min: {min(hardnesses)}  max: {max(hardnesses)}  unique: {len(set(hardnesses))}"
+    )
+    print(
+        f"Roundness — min: {min(roundnesses)}  max: {max(roundnesses)}  unique: {len(set(roundnesses))}"
+    )
+    print(
+        f"Spacing   — min: {min(spacings)}  max: {max(spacings)}  unique: {len(set(spacings))}"
+    )
 
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-    for ax, values, name in zip(axes,
+    for ax, values, name in zip(
+        axes,
         [sizes, hardnesses, roundnesses, spacings],
-        ["Size", "Hardness", "Roundness", "Spacing"]):
+        ["Size", "Hardness", "Roundness", "Spacing"],
+    ):
         ax.hist(values, bins=20)
         ax.set_title(name)
     plt.tight_layout()
     plt.savefig("dataset_distribution.png", dpi=150)
     plt.show()
 
+
 # ============================================================
 # DATASET
 # ============================================================
+
 
 class BrushDataset(Dataset):
     """
@@ -93,10 +107,13 @@ class BrushDataset(Dataset):
         self.samples = []
         pattern = re.compile(r"brush_s(\d+)_h(\d+)_r(\d+)_sp(\d+)\.png")
 
-        png_files = sorted([
-            f for f in os.listdir(data_dir)
-            if f.endswith(".png") and not f.startswith("._")
-        ])
+        png_files = sorted(
+            [
+                f
+                for f in os.listdir(data_dir)
+                if f.endswith(".png") and not f.startswith("._")
+            ]
+        )
 
         if not png_files:
             raise FileNotFoundError(f"No PNG files found in {data_dir}")
@@ -115,23 +132,30 @@ class BrushDataset(Dataset):
                 skipped_small += 1
                 continue
 
-            label = torch.tensor([
-                size                    / NORM["size"],
-                int(match.group(2))     / NORM["hardness"],
-                int(match.group(3))     / NORM["roundness"],
-                int(match.group(4))     / NORM["spacing"],
-            ], dtype=torch.float32)
+            label = torch.tensor(
+                [
+                    size / NORM["size"],
+                    int(match.group(2)) / NORM["hardness"],
+                    int(match.group(3)) / NORM["roundness"],
+                    int(match.group(4)) / NORM["spacing"],
+                ],
+                dtype=torch.float32,
+            )
 
-            img_path  = os.path.join(data_dir, fname)
-            img       = Image.open(img_path).convert("L").resize((IMG_SIZE, IMG_SIZE))
+            img_path = os.path.join(data_dir, fname)
+            img = Image.open(img_path).convert("L").resize((IMG_SIZE, IMG_SIZE))
             img_tensor = torch.tensor(
                 np.array(img, dtype=np.float32) / 255.0
-            ).unsqueeze(0)   # (1, 224, 224)
+            ).unsqueeze(
+                0
+            )  # (1, 224, 224)
 
             self.samples.append((img_tensor, label))
 
-        print(f"  Loaded {len(self.samples)} valid samples. "
-              f"(skipped {skipped_small} with size < 5px)")
+        print(
+            f"  Loaded {len(self.samples)} valid samples. "
+            f"(skipped {skipped_small} with size < 5px)"
+        )
 
     def __len__(self):
         return len(self.samples)
@@ -143,27 +167,28 @@ class BrushDataset(Dataset):
 def make_dataloaders(data_dir):
     """Split dataset into train/val and return DataLoaders."""
     dataset = BrushDataset(data_dir)
-    n_val   = int(len(dataset) * VAL_SPLIT)
+    n_val = int(len(dataset) * VAL_SPLIT)
     n_train = len(dataset) - n_val
 
     train_set, val_set = random_split(
-        dataset, [n_train, n_val],
-        generator=torch.Generator().manual_seed(42)
+        dataset, [n_train, n_val], generator=torch.Generator().manual_seed(42)
     )
 
     train_loader = DataLoader(
-        train_set, batch_size=BATCH_SIZE, shuffle=True,  num_workers=0
+        train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0
     )
     val_loader = DataLoader(
-        val_set,   batch_size=BATCH_SIZE, shuffle=False, num_workers=0
+        val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0
     )
 
     print(f"  Train: {n_train} samples  |  Val: {n_val} samples")
     return train_loader, val_loader, val_set
 
+
 # ============================================================
 # MODEL
 # ============================================================
+
 
 class BrushCNN(nn.Module):
     """
@@ -183,22 +208,22 @@ class BrushCNN(nn.Module):
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2)          # 224 -> 112
+            nn.MaxPool2d(2),  # 224 -> 112
         )
         self.block2 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2)          # 112 -> 56
+            nn.MaxPool2d(2),  # 112 -> 56
         )
         self.block3 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2)          # 56 -> 28
+            nn.MaxPool2d(2),  # 56 -> 28
         )
 
-        self.gap = nn.AdaptiveAvgPool2d(1)   # (batch, 128, 1, 1)
+        self.gap = nn.AdaptiveAvgPool2d(1)  # (batch, 128, 1, 1)
 
         self.head = nn.Sequential(
             nn.Flatten(),
@@ -206,7 +231,7 @@ class BrushCNN(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
             nn.Linear(64, 4),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -216,9 +241,12 @@ class BrushCNN(nn.Module):
         x = self.gap(x)
         x = self.head(x)
         return x
+
+
 # ============================================================
 # WEIGHTED LOSS
 # ============================================================
+
 
 def weighted_mse(pred, target):
     """
@@ -229,9 +257,11 @@ def weighted_mse(pred, target):
     weights = torch.tensor([1.0, 1.0, 1.0, 1.0], device=pred.device)
     return (weights * (pred - target) ** 2).mean()
 
+
 # ============================================================
 # TRAINING
 # ============================================================
+
 
 def train_one_epoch(model, loader, optimizer):
     model.train()
@@ -243,7 +273,7 @@ def train_one_epoch(model, loader, optimizer):
 
         optimizer.zero_grad()
         preds = model(images)
-        loss  = weighted_mse(preds, labels)
+        loss = weighted_mse(preds, labels)
         loss.backward()
         optimizer.step()
 
@@ -251,9 +281,11 @@ def train_one_epoch(model, loader, optimizer):
 
     return total_loss / len(loader.dataset)
 
+
 # ============================================================
 # VALIDATION
 # ============================================================
+
 
 def validate(model, loader):
     model.eval()
@@ -263,15 +295,17 @@ def validate(model, loader):
         for images, labels in loader:
             images = images.to(DEVICE)
             labels = labels.to(DEVICE)
-            preds  = model(images)
-            loss   = weighted_mse(preds, labels)
+            preds = model(images)
+            loss = weighted_mse(preds, labels)
             total_loss += loss.item() * len(images)
 
     return total_loss / len(loader.dataset)
 
+
 # ============================================================
 # TESTING
 # ============================================================
+
 
 def test_model(model, val_set, num_samples=10):
     """
@@ -281,7 +315,12 @@ def test_model(model, val_set, num_samples=10):
     """
     model.eval()
     param_names = ["size (px)", "hardness (%)", "roundness (%)", "spacing (%)"]
-    norm_values = [NORM["size"], NORM["hardness"], NORM["roundness"], NORM["spacing"]]
+    norm_values = [
+        NORM["size"],
+        NORM["hardness"],
+        NORM["roundness"],
+        NORM["spacing"],
+    ]
 
     num_samples = min(num_samples, len(val_set))
     losses = []
@@ -294,17 +333,19 @@ def test_model(model, val_set, num_samples=10):
         for i in range(num_samples):
             image, label = val_set[i]
             image_in = image.unsqueeze(0).to(DEVICE)
-            pred     = model(image_in).squeeze(0).cpu()
+            pred = model(image_in).squeeze(0).cpu()
 
             mse = ((pred - label) ** 2).mean().item()
             losses.append(mse)
 
             print(f"\n  Sample {i+1}   (MSE: {mse:.5f})")
             for j, (name, scale) in enumerate(zip(param_names, norm_values)):
-                pred_real  = pred[j].item()  * scale
+                pred_real = pred[j].item() * scale
                 truth_real = label[j].item() * scale
-                error      = pred_real - truth_real
-                print(f"  {name:<14}  {pred_real:>10.2f}  {truth_real:>10.2f}  {error:>+10.2f}")
+                error = pred_real - truth_real
+                print(
+                    f"  {name:<14}  {pred_real:>10.2f}  {truth_real:>10.2f}  {error:>+10.2f}"
+                )
 
     print(f"\n{'─'*65}")
     print(f"  Mean test MSE over {num_samples} samples: {np.mean(losses):.5f}")
@@ -312,17 +353,19 @@ def test_model(model, val_set, num_samples=10):
 
     return losses
 
+
 # ============================================================
 # PLOTTING
 # ============================================================
+
 
 def plot_loss(train_losses, val_losses, test_losses):
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     fig.suptitle("Brush ResNet -- Training & Test Loss", fontsize=14)
 
     ax = axes[0]
-    ax.plot(train_losses, label="Train loss",      linewidth=2)
-    ax.plot(val_losses,   label="Validation loss", linewidth=2, linestyle="--")
+    ax.plot(train_losses, label="Train loss", linewidth=2)
+    ax.plot(val_losses, label="Validation loss", linewidth=2, linestyle="--")
     ax.set_ylim(bottom=0)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("MSE")
@@ -333,8 +376,13 @@ def plot_loss(train_losses, val_losses, test_losses):
     ax = axes[1]
     x = np.arange(1, len(test_losses) + 1)
     ax.bar(x, test_losses, color="steelblue", alpha=0.8)
-    ax.axhline(np.mean(test_losses), color="crimson", linestyle="--",
-               linewidth=1.5, label=f"Mean: {np.mean(test_losses):.4f}")
+    ax.axhline(
+        np.mean(test_losses),
+        color="crimson",
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Mean: {np.mean(test_losses):.4f}",
+    )
     ax.set_ylim(bottom=0)
     ax.set_xlabel("Sample index")
     ax.set_ylabel("MSE")
@@ -348,81 +396,94 @@ def plot_loss(train_losses, val_losses, test_losses):
     plt.show()
     print("Loss plot saved -> brush_cnn_loss.png")
 
+
 # ============================================================
 # MAIN
 # ============================================================
 
-def main():
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR   = os.path.join(SCRIPT_DIR, "Data")
 
-    inspect_dataset(DATA_DIR)
+def main():
+    cmd = input("Y to run full training loop, X to test sample")
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(SCRIPT_DIR, "Data")
 
     print(f"\nLoading dataset from '{DATA_DIR}' ...")
     train_loader, val_loader, val_set = make_dataloaders(DATA_DIR)
 
-    model     = BrushCNN().to(DEVICE)
+    model = BrushCNN().to(DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=LR)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=4
     )
 
-    print(f"\nModel parameters: {sum(p.numel() for p in model.parameters()):,}")
+    # print(f"\nModel parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-    train_losses      = []
-    val_losses        = []
-    best_val          = float("inf")
+    train_losses = []
+    val_losses = []
+    best_val = float("inf")
     epochs_no_improve = 0
-    test_losses       = []
+    test_losses = []
 
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    checkpoint_path = os.path.join(SCRIPT_DIR, "brush_cnn_best.pt")
+    if cmd == "N":
+        print("Testing batch of 10 samples")
+        test_model(model, val_set, num_samples=10)
 
-    for epoch in range(1, EPOCHS + 1):
-        print(f"\n{'='*50}")
-        print(f"Epoch {epoch}/{EPOCHS}")
-        print(f"{'='*50}")
+    if cmd == "Y":
+        SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+        checkpoint_path = os.path.join(SCRIPT_DIR, "brush_cnn_best.pt")
 
-        train_loss = train_one_epoch(model, train_loader, optimizer)
-        val_loss   = validate(model, val_loader)
-        scheduler.step(val_loss)
+        for epoch in range(1, EPOCHS + 1):
+            print(f"\n{'='*50}")
+            print(f"Epoch {epoch}/{EPOCHS}")
+            print(f"{'='*50}")
 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+            train_loss = train_one_epoch(model, train_loader, optimizer)
+            val_loss = validate(model, val_loader)
+            scheduler.step(val_loss)
 
-        print(f"  Train MSE: {train_loss:.5f}  |  Val MSE: {val_loss:.5f}")
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
 
-        # Checkpoint
-        if val_loss < best_val:
-            best_val = val_loss
-            epochs_no_improve = 0
-            torch.save({
-                "epoch":       epoch,
-                "model_state": model.state_dict(),
-                "optim_state": optimizer.state_dict(),
-                "val_loss":    best_val,
-            }, checkpoint_path)
-            print(f"  Saved best model (val_loss: {best_val:.5f})")
-        else:
-            epochs_no_improve += 1
-            print(f"  No improvement for {epochs_no_improve}/{PATIENCE} epochs")
+            print(f"  Train MSE: {train_loss:.5f}  |  Val MSE: {val_loss:.5f}")
 
-        # Per-epoch test
-        test_losses = test_model(model, val_set, num_samples=5)
+            # Checkpoint
+            if val_loss < best_val:
+                best_val = val_loss
+                epochs_no_improve = 0
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state": model.state_dict(),
+                        "optim_state": optimizer.state_dict(),
+                        "val_loss": best_val,
+                    },
+                    checkpoint_path,
+                )
+                print(f"  Saved best model (val_loss: {best_val:.5f})")
+            else:
+                epochs_no_improve += 1
+                print(
+                    f"  No improvement for {epochs_no_improve}/{PATIENCE} epochs"
+                )
 
-        # Early stopping
-        if epochs_no_improve >= PATIENCE:
-            print(f"\nEarly stopping -- no improvement for {PATIENCE} epochs.")
-            print("Loading best weights...")
-            checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
-            model.load_state_dict(checkpoint["model_state"])
-            break
+            # Per-epoch test
+            test_losses = test_model(model, val_set, num_samples=5)
 
-    # Final test on best model
-    print("\nFinal test on best model weights:")
-    test_losses = test_model(model, val_set, num_samples=10)
+            # Early stopping
+            if epochs_no_improve >= PATIENCE:
+                print(
+                    f"\nEarly stopping -- no improvement for {PATIENCE} epochs."
+                )
+                print("Loading best weights...")
+                checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+                model.load_state_dict(checkpoint["model_state"])
+                break
 
-    plot_loss(train_losses, val_losses, test_losses)
+        # Final test on best model
+        print("\nFinal test on best model weights:")
+        test_losses = test_model(model, val_set, num_samples=10)
+
+        plot_loss(train_losses, val_losses, test_losses)
 
 
 if __name__ == "__main__":

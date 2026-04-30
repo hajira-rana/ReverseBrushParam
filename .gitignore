@@ -1,4 +1,5 @@
 Data
+.DS_Store
 venv
 path.psd
 test.psd
