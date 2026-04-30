@@ -30,7 +30,7 @@ IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS = 50
 LR = 1e-4
-VAL_SPLIT = 0.2
+VAL_SPLIT = 0.4
 PATIENCE = 8
 
 NORM = {
@@ -403,18 +403,13 @@ def plot_loss(train_losses, val_losses, test_losses):
 
 
 def main():
-    cmd = input("Y to run full training loop, N to test sample")
+    cmd = input("Y to run full training loop, N to test sample: ")
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(SCRIPT_DIR, "Data")
 
     print(f"\nLoading dataset from '{DATA_DIR}' ...")
     train_loader, val_loader, val_set = make_dataloaders(DATA_DIR)
 
-    model = BrushCNN().to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=4
-    )
 
     # print(f"\nModel parameters: {sum(p.numel() for p in model.parameters()):,}")
 
@@ -423,10 +418,28 @@ def main():
     best_val = float("inf")
     epochs_no_improve = 0
     test_losses = []
+    model = BrushCNN().to(DEVICE)
+    optimizer = optim.Adam(model.parameters(), lr=LR)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=4
+    )
+
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    checkpoint_path = os.path.join(SCRIPT_DIR, "brush_cnn_best.pt")
+
+    # Load saved weights if they exist
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+        model.load_state_dict(checkpoint["model_state"])
+        print(f"Loaded checkpoint from epoch {checkpoint['epoch']} "
+            f"(val_loss: {checkpoint['val_loss']:.5f})")
+    else:
+        print("No checkpoint found — model is untrained.")
 
     if cmd == "N":
-        print("Testing batch of 10 samples")
-        test_model(model, val_set, num_samples=10)
+        print("Testing batch of 20 samples")
+        test_losses = test_model(model, val_set, num_samples=20)
+        plot_loss(train_losses, val_losses, test_losses)
 
     if cmd == "Y":
         SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
