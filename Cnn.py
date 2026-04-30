@@ -403,7 +403,7 @@ def plot_loss(train_losses, val_losses, test_losses):
 
 
 def main():
-    cmd = input("Y to run full training loop, X to test sample")
+    cmd = input("Y to run full training loop, N to test sample")
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(SCRIPT_DIR, "Data")
 
