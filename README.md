@@ -1,4 +1,5 @@
 # CSCE625Final
+This is a naive implementation of my reverse brush parameter estimation solution. This project utilizes a CNN to estimate the parameters used to make a a brushstroke from a given image of the stroke. Currently the project supports estimation between Hardness, Spacing, Size, and Roundness of a circlular brush tip. 
 
 To run a sample dataset:
 
